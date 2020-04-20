@@ -1,0 +1,4 @@
+(tests
+  (names test)
+  (deps (glob_files pass/*.med))
+  (libraries medley))

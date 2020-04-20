@@ -1,0 +1,3 @@
+def id1 : forall a, a -> a = fun x -> x
+
+def id2 = fun x -> x

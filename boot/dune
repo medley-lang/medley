@@ -1,0 +1,9 @@
+(ocamllex lexer)
+
+(menhir
+  (modules parser)
+  (flags --table))
+
+(library
+  (name medley)
+  (libraries menhirLib))
