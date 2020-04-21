@@ -1,3 +1,6 @@
+(** This file specifies the abstract syntax of the language. The types here
+    describe the data that the parser outputs. *)
+
 type 'a node = {
     node : 'a;
   }
@@ -23,7 +26,7 @@ type expr =
   | Var of string
 
 and clause = {
-    lhs : pat node list;
+    lhs : pat node * pat node list;
     rhs : expr node;
   }
 

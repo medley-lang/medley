@@ -7,7 +7,8 @@ let () =
     [ "data", DATA
     ; "def", DEF
     ; "forall", FORALL
-    ; "fun", FUN ]
+    ; "fun", FUN
+    ; "unit", UNIT ]
 }
 
 let whitespace = [' ' '\t']
@@ -38,3 +39,17 @@ rule main = parse
     | None -> LIDENT str
     }
   | eof { EOF }
+
+{
+module I = Parser.MenhirInterpreter
+
+let handle_errs filename lexbuf parser =
+  let succeed a = Ok a in
+  let fail _ =
+    Result.Error
+      (filename, Lexing.lexeme_start_p lexbuf, Lexing.lexeme_end_p lexbuf)
+  in
+  let supplier = I.lexer_lexbuf_to_supplier main lexbuf in
+  I.loop_handle succeed fail supplier (parser lexbuf.Lexing.lex_curr_p)
+
+}

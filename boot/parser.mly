@@ -2,6 +2,7 @@
 %token FUN
 %token DATA
 %token DEF
+%token UNIT
 %token BAR
 %token LPAREN
 %token RPAREN
@@ -16,11 +17,15 @@
 %token EOF
 
 %start <Ast.program> program
+%start <Ast.ty_scheme> toplevel_ty_scheme
 
 %%
 
 let program :=
   | decls = list(decl); EOF; { Ast.{ decls } }
+
+let toplevel_ty_scheme :=
+  | ~ = ty_scheme; EOF; { ty_scheme }
 
 let decl :=
   | DATA; name = UIDENT; params = list(LIDENT);
@@ -49,6 +54,7 @@ let ty2 :=
   | ty3
 
 let ty3 :=
+  | UNIT; { Ast.{ node = Unit } }
   | name = LIDENT; { Ast.{ node = TyVar name } }
   | LPAREN; ~ = ty; RPAREN; { ty }
 
@@ -67,7 +73,8 @@ let expr2 :=
   | LPAREN; ~ = expr; RPAREN; { expr }
 
 let clause :=
-  | lhs = list(pat1); ARROW; rhs = expr; { Ast.{ lhs; rhs } }
+  | pat = pat1; pats = list(pat1); ARROW; rhs = expr;
+    { Ast.{ lhs = (pat, pats); rhs } }
 
 let pat :=
   | name = UIDENT; pats = list(pat); { Ast.{ node = Ast.ConPat(name, pats) } }
@@ -77,3 +84,5 @@ let pat1 :=
   | name = LIDENT; { Ast.{ node = Ast.VarPat name } }
   | UNDERSCORE; { Ast.{ node = Ast.WildPat } }
   | LPAREN; ~ = pat; RPAREN; { pat }
+
+%%
