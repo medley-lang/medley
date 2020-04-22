@@ -1,5 +1,14 @@
+type level = int
 type rigid = int
-type wobbly = int
+type wobbly = {
+    fv_id : int;
+    level : level;
+  }
+
+module FreeVar = struct
+  type t = wobbly
+  let compare lhs rhs = compare lhs.fv_id rhs.fv_id
+end
 
 type ty =
   | Arrow of ty * ty
@@ -66,5 +75,5 @@ let rec print_ty prec = function
      else
        s
   | Rigid r -> "r" ^ string_of_int r
-  | Wobbly w -> "?" ^ string_of_int w
+  | Wobbly w -> "?" ^ string_of_int w.fv_id
   | Unit -> "unit"

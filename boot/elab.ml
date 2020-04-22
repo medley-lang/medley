@@ -1,13 +1,5 @@
-module ResultMonad = struct
-  let (let+) r f = Result.map f r
-  let (and+) l r = match l, r with
-    | Ok l, Ok r -> Ok(l, r)
-    | Ok _, Error e -> Error e
-    | Error e, _ -> Error e
-end
-
 let rec from_ast_ty ty =
-  let open ResultMonad in
+  let open Util.Result in
   match ty.Ast.node with
   | Ast.Arrow(dom, codom) ->
      let+ dom = from_ast_ty dom
@@ -20,15 +12,14 @@ let rec from_ast_ty ty =
   | Ast.TyVar _ -> Error ()
   | Ast.Unit -> Ok Term.Unit
 
-type constraints =
-  | Subtype of Term.ty * Term.ty
-
 type state = {
     focus : Term.preterm;
-    wobblyvar_supply : int;
+    level : int;
+    bv_supply : int;
+    fv_supply : int;
     hole_supply : int;
     hole_map : Term.preterm Term.HoleMap.t;
-    constraints : constraints list;
+    constraints : HM.constraints list;
   }
 
 type 'a t = state -> ('a, Error.t) result * state
@@ -73,7 +64,9 @@ open Monad
 
 let empty_state focus =
   { focus
-  ; wobblyvar_supply = 0
+  ; level = 0
+  ; bv_supply = 0
+  ; fv_supply = 0
   ; hole_supply = 1
   ; hole_map = Term.HoleMap.empty
   ; constraints = [] }
@@ -89,8 +82,50 @@ let catch action handler state =
 let get_state state = (Ok state, state)
 
 let fresh_wobbly state =
-  let x = state.wobblyvar_supply in
-  (Ok x, { state with wobblyvar_supply = x + 1 })
+  let x = state.fv_supply in
+  ( Ok { Term.fv_id = x; level = state.level }
+  , { state with fv_supply = x + 1 } )
+
+let fresh_bv state =
+  let x = state.bv_supply in
+  (Ok x, { state with bv_supply = x + 1 })
+
+(** Let-generalization. *)
+let rec gen bound_vars = function
+  | Term.Arrow(dom, codom) ->
+     let* bound_vars, dom = gen bound_vars dom in
+     let+ bound_vars, codom = gen bound_vars codom in
+     bound_vars, Term.Arrow(dom, codom)
+  | Term.TyApp(tcon, targ) ->
+     let* bound_vars, tcon = gen bound_vars tcon in
+     let+ bound_vars, targ = gen bound_vars targ in
+     bound_vars, Term.TyApp(tcon, targ)
+  | Term.Rigid r -> return (bound_vars, Term.Rigid r)
+  | Term.Unit -> return (bound_vars, Term.Unit)
+  | Term.Wobbly w ->
+     let* state = get_state in
+     if w.Term.level >= state.level then
+       match HM.Gen.find_opt w bound_vars with
+       | None ->
+          let+ bv = fresh_bv in
+          (HM.Gen.add w bv bound_vars, Term.Rigid bv)
+       | Some r -> return (bound_vars, Term.Rigid r)
+     else
+       return (bound_vars, Term.Wobbly w)
+
+(** Given a map from free variables to bound variables, returns the bound
+    variables as a list. *)
+let bound_vars bvs =
+  HM.Gen.to_seq bvs
+  |> Seq.map (fun (_, v) -> v)
+  |> List.of_seq
+
+(** Generalize the monotype. *)
+let generalize ty =
+  let+ bvs, ty = gen HM.Gen.empty ty in
+  Term.Forall(bound_vars bvs, ty)
+
+(** Operations on holes. *)
 
 let fresh_hole f state =
   let x = state.hole_supply in
@@ -98,7 +133,7 @@ let fresh_hole f state =
   ( Ok preterm
   , { state with
       hole_map = Term.HoleMap.add x preterm state.hole_map
-    ; hole_supply = x + 1 })
+    ; hole_supply = x + 1 } )
 
 let get_focus state =
   (Ok state.focus, state)
@@ -109,10 +144,15 @@ let get_holes state =
 let modify f state =
   (Ok (), f state)
 
-let subtype sub super =
+let eq lhs rhs =
   modify (fun state ->
       { state with
-        constraints = Subtype(sub, super) :: state.constraints })
+        constraints = HM.Eq(lhs, rhs) :: state.constraints })
+
+let inst monotype ty_scheme =
+  modify (fun state ->
+      { state with
+        constraints = HM.Inst(monotype, ty_scheme) :: state.constraints })
 
 let fill tactic focus =
   let+ preterm = tactic focus in
@@ -149,7 +189,7 @@ let intro var focus =
        and* t1 = fresh_wobbly in
        let domain = Term.Wobbly t0
        and codomain = Term.Wobbly t1 in
-       let+ () = subtype (Term.Arrow(domain, codomain)) (Term.Wobbly wobbly) in
+       let+ () = eq (Term.Arrow(domain, codomain)) (Term.Wobbly wobbly) in
        (domain, codomain)
     | _ -> throw Error.IntroTac
   in
@@ -171,7 +211,7 @@ let trivial focus =
   match focus.Term.expected_ty with
   | Term.Unit -> return Term.PreTrivial
   | Term.Wobbly wobbly ->
-     let+ () = subtype Term.Unit (Term.Wobbly wobbly) in
+     let+ () = eq Term.Unit (Term.Wobbly wobbly) in
      Term.PreTrivial
   | _ -> throw Error.TrivialTac
 

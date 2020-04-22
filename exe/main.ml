@@ -34,6 +34,9 @@ let rec loop state =
       | Error.UnknownTac ->
          print_endline "Unknown tactic";
          loop
+      | _ ->
+         print_endline "Other error";
+         loop
   )) state
 
 let () =
