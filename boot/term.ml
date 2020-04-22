@@ -13,8 +13,8 @@ end
 type ty =
   | Arrow of ty * ty
   | TyApp of ty * ty
-  | Rigid of rigid
-  | Wobbly of wobbly
+  | Bound_var of rigid
+  | Free_var of wobbly
   | Unit
 
 type ty_scheme = Forall of int list * ty
@@ -74,6 +74,6 @@ let rec print_ty prec = function
        "(" ^ s ^ ")"
      else
        s
-  | Rigid r -> "r" ^ string_of_int r
-  | Wobbly w -> "?" ^ string_of_int w.fv_id
+  | Bound_var r -> "r" ^ string_of_int r
+  | Free_var w -> "?" ^ string_of_int w.fv_id
   | Unit -> "unit"

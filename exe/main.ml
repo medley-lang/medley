@@ -1,4 +1,4 @@
-open Medley
+(*open Medley
 
 (* Must eta-expand state monad for let-generalization to kick in *)
 let rec loop state =
@@ -65,3 +65,4 @@ let () =
         match result with
         | Ok _-> ()
         | Error _ -> print_endline "Failed"
+ *)

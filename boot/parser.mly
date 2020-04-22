@@ -81,6 +81,7 @@ let pat :=
   | pat1
 
 let pat1 :=
+  | LPAREN; RPAREN; { Ast.{ node = TrivialPat } }
   | name = LIDENT; { Ast.{ node = Ast.VarPat name } }
   | UNDERSCORE; { Ast.{ node = Ast.WildPat } }
   | LPAREN; ~ = pat; RPAREN; { pat }

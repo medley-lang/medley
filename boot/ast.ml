@@ -16,6 +16,7 @@ type ty_scheme = Forall of string list * ty node
 type pat =
   | ConPat of string * pat node list
   | VarPat of string
+  | TrivialPat
   | WildPat
 
 type expr =
